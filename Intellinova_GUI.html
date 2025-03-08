@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Role-Based Login with Threat Intelligence</title>
+  <script>
+    async function importSQL() {
+      const sqlFile = "threat_intelligence_db.sql";
+      try {
+        const response = await fetch(sqlFile);
+        if (!response.ok) {
+          throw new Error("Failed to load SQL file");
+        }
+        const sqlContent = await response.text();
+        console.log("SQL File Loaded:\n", sqlContent);
+      } catch (error) {
+        console.error("Error loading SQL file:", error);
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    h1, h2, h3 {
+      text-align: center;
+    }
+    .role-section {
+      display: none;
+      margin: 20px 0;
+      border: 1px solid #ccc;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    label {
+      display: inline-block;
+      width: 100px;
+    }
+    select, button, input {
+      padding: 5px 10px;
+      margin: 5px 0;
+    }
+    .hidden {
+      display: none !important;
+    }
+    .database-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        background: white;
+    }
+    .database-table th, .database-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    .database-table th {
+        background-color: #f4f4f4;
+    }
+    .database-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    .database-container {
+        margin: 20px 0;
+        overflow-x: auto;
+    }
+    .refresh-button {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 10px 0;
+    }
+    .refresh-button:hover {
+        background-color: #45a049;
+    }
+    .risk-score {
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }
+    .high-risk {
+        background-color: #ffebee;
+        color: #c62828;
+    }
+    .medium-risk {
+        background-color: #fff3e0;
+        color: #ef6c00;
+    }
+    .low-risk {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+    }
+    .recommendations {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-radius: 5px;
+    }
+    .recommendations ul {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+    .recommendations li {
+        margin: 5px 0;
+    }
+    .location-details {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 15px 0;
+        border-left: 4px solid #007bff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .location-details h5 {
+        margin-top: 0;
+        color: #2c3e50;
+        font-size: 1.1em;
+    }
+    .location-details p {
+        margin: 8px 0;
+        line-height: 1.4;
+    }
+    .location-details strong {
+        color: #34495e;
+        font-weight: 600;
+    }
+    .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+
+<body>
+  
+  <div class="container">
+    <div style="text-align: center;">
+      <img src="Group 2.jpg" alt="IntelliNova Logo" width="200" height="100">
+    </div>
+
+    <div id="login-section">
+      <h2>Login</h2>
+      <label for="username">Username:</label>
+      <input type="text" id="username" placeholder="Enter your username">
+      <br />
+      <label for="password">Password:</label>
+      <input type="password" id="password" placeholder="Enter your password">
+      <br />
+      
+      <label for="roleSelect">Select Role:</label>
+      <select id="roleSelect">
+        <option disabled selected>Select a role</option>
+        <option value="administrator">IT Administrator</option>
+        <option value="securityAnalyst">Security Analyst</option>
+        <option value="user">User</option>
+        <option value="desktopSupport">Desktop Support</option>
+        <option value="technicalSupport">Technical Support</option>
+      </select>
+      <br />
+      <button onclick="handleLogin()">Login</button>
+      <p id="loginmessage" style="color: red;"></p>
+    </div>
+
+    <div id="logout-section" class="hidden">
+      <h3>You are logged in!</h3>
+      <button onclick="handleLogout()">Logout</button>
+    </div>
+
+    <div id="administrator-section" class="role-section">
+      <h3>IT Administrator Section</h3>
+      <p>Welcome, Administrator! Here you can manage system configurations, user permissions, and more.</p>
+
+      <div class="admin-panel">
+        <h4>Threat Intelligence Dashboard</h4>
+        <button onclick="requestThreatIntelligence()">Request Threat Analysis</button>
+        <div>
+          <label for="threatType">Threat Type:</label>
+          <select id="threatType">
+            <option value="ip">IP Address</option>
+            <option value="domain">Domain</option>
+            <option value="url">URL</option>
+          </select>
+        </div>
+        <input type="text" id="threatInput" placeholder="Enter IP, Domain, or URL">
+        <div id="threat-results" style="margin-top: 15px; background: #f5f5f5; padding: 10px; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+          <p>No threat analysis data available. Click "Request Threat Analysis" to begin.</p>
+        </div>
+      </div>
+
+      <div class="misp-section">
+        <h3>Automated Threat Intelligence</h3>
+        <button onclick="displayMISPEvents()">Fetch MISP Events</button>
+        <div id="misp-results" style="margin-top: 15px; background: #f5f5f5; padding: 10px; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+          <p>No MISP data available. Click "Fetch MISP Events" to begin.</p>
+        </div>
+      </div>
+
+      <div class="database-container">
+        
+
+    <div id="securityAnalyst-section" class="role-section">
+      <h3>Security Analyst Section</h3>
+      <p>Content visible to Security Analysts.</p>
+    </div>
+
+    <script>
+
+      // Roles, right after <script>
+const sampleData = {
+  users: [
+      { UserID: 101, Username: "admin", Role: "Administrator", LastLogin: new Date().toISOString() },
+      { UserID: 102, Username: "analyst1", Role: "Security Analyst", LastLogin: new Date().toISOString() },
+      { UserID: 103, Username: "user1", Role: "User", LastLogin: new Date().toISOString() }
+  ],
+  securityEvents: [
+      { EventID: 1, UserID: 101, ActionTaken: "System Login", Timestamp: new Date().toISOString() },
+      { EventID: 2, UserID: 101, ActionTaken: "Threat Analysis Request", Timestamp: new Date().toISOString() }
+  ],
+  threatIntelligence: [
+      { ThreatID: 1, ThreatType: "IP", Severity: 8, Description: "Malicious IP detected" },
+      { ThreatID: 2, ThreatType: "Domain", Severity: 6, Description: "Suspicious domain activity" }
+  ],
+  incidentReports: [
+      { ReportID: 1, UserID: 101, IncidentType: "Unauthorized Access", Status: "Open", DateCreated: new Date().toISOString() },
+      { ReportID: 2, UserID: 102, IncidentType: "Malware Detection", Status: "Closed", DateCreated: new Date().toISOString() }
+  ]
+};
+
+// Functions
+async function fetchAndDisplayUsers() {
+  try {
+      const tableHTML = generateTableHTML(sampleData.users, ['UserID', 'Username', 'Role', 'LastLogin']);
+      document.getElementById('users-table').innerHTML = tableHTML;
+  } catch (error) {
+      console.error('Error displaying users:', error);
+      document.getElementById('users-table').innerHTML = '<p class="error">Error loading users data</p>';
+  }
+}
+
+async function fetchAndDisplaySecurityEvents() {
+  try {
+      const tableHTML = generateTableHTML(sampleData.securityEvents, ['EventID', 'UserID', 'ActionTaken', 'Timestamp']);
+      document.getElementById('security-events-table').innerHTML = tableHTML;
+  } catch (error) {
+      console.error('Error displaying security events:', error);
+      document.getElementById('security-events-table').innerHTML = '<p class="error">Error loading security events</p>';
+  }
+}
+
+async function fetchAndDisplayThreatIntelligence() {
+  try {
+      const tableHTML = generateTableHTML(sampleData.threatIntelligence, ['ThreatID', 'ThreatType', 'Severity', 'Description']);
+      document.getElementById('threat-intelligence-table').innerHTML = tableHTML;
+  } catch (error) {
+      console.error('Error displaying threat intelligence:', error);
+      document.getElementById('threat-intelligence-table').innerHTML = '<p class="error">Error loading threat intelligence data</p>';
+  }
+}
+
+async function fetchAndDisplayIncidentReports() {
+  try {
+      const tableHTML = generateTableHTML(sampleData.incidentReports, ['ReportID', 'UserID', 'IncidentType', 'Status', 'DateCreated']);
+      document.getElementById('incident-reports-table').innerHTML = tableHTML;
+  } catch (error) {
+      console.error('Error displaying incident reports:', error);
+      document.getElementById('incident-reports-table').innerHTML = '<p class="error">Error loading incident reports</p>';
+  }
+}
+
+// Update Functions to work with sample data
+async function logSecurityEvent(eventData) {
+  try {
+      const newEvent = {
+          EventID: sampleData.securityEvents.length + 1,
+          ...eventData
+      };
+      sampleData.securityEvents.push(newEvent);
+      return newEvent;
+  } catch (error) {
+      console.error('Error logging security event:', error);
+  }
+}
+
+async function storeThreatIntelligence(threatData) {
+  try {
+      const newThreat = {
+          ThreatID: sampleData.threatIntelligence.length + 1,
+          ...threatData
+      };
+      sampleData.threatIntelligence.push(newThreat);
+      return newThreat;
+  } catch (error) {
+      console.error('Error storing threat intelligence:', error);
+  }
+}
+
+async function createIncidentReport(incidentData) {
+  try {
+      const newReport = {
+          ReportID: sampleData.incidentReports.length + 1,
+          ...incidentData
+      };
+      sampleData.incidentReports.push(newReport);
+      return newReport;
+  } catch (error) {
+      console.error('Error creating incident report:', error);
+  }
+}
+
+      
+
+
+
+
+
+      function handleLogin() {
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value.trim();
+        const role = document.getElementById("roleSelect").value;
+        const loginMessage = document.getElementById("loginmessage");
+
+        const adminUsername = "admin";
+        const adminPassword = "admin123";
+
+        if (!username || !password || !role || role === "Select a role") {
+          loginMessage.textContent = "Please enter all details.";
+          return;
+        }
+
+        if (role === "administrator" && (username !== adminUsername || password !== adminPassword)) {
+          loginMessage.textContent = "Invalid IT Administrator credentials.";
+          return;
+        }
+
+        loginMessage.textContent = "";
+        document.getElementById("login-section").classList.add("hidden");
+        document.getElementById("logout-section").classList.remove("hidden");
+
+        document.querySelectorAll(".role-section").forEach(section => section.style.display = "none");
+        document.getElementById(role + "-section").style.display = "block";
+
+        if (role === 'administrator') {
+          initializeAdminDashboard();
+        }
+      }
+
+      async function initializeAdminDashboard() {
+        try {
+          const tables = ['users-table', 'security-events-table', 'threat-intelligence-table', 'incident-reports-table'];
+          tables.forEach(tableId => {
+            document.getElementById(tableId).innerHTML = '<p>Loading data...</p>';
+          });
+
+          await refreshDatabaseView();
+
+          const currentUser = {
+            UserID: 101,
+            Username: document.getElementById("username").value,
+            Role: "administrator",
+            LastLogin: new Date().toISOString()
+          };
+
+          await logSecurityEvent({
+            UserID: currentUser.UserID,
+            ActionTaken: "Administrator login successful",
+            Timestamp: new Date().toISOString()
+          });
+
+        } catch (error) {
+          console.error('Error initializing admin dashboard:', error);
+          document.getElementById('administrator-section').innerHTML += `
+            <div style="color: red; margin-top: 10px;">
+                
+          `;
+        }
+      }
+
+      function handleLogout() {
+        document.getElementById("login-section").classList.remove("hidden");
+        document.getElementById("logout-section").classList.add("hidden");
+        document.querySelectorAll(".role-section").forEach(section => section.style.display = "none");
+        document.getElementById("username").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("roleSelect").selectedIndex = 0;
+      }
+
+      async function requestThreatIntelligence() {
+        const threatType = document.getElementById("threatType").value;
+        const threatInput = document.getElementById("threatInput").value.trim();
+        const resultContainer = document.getElementById("threat-results");
+        const currentUserID = getCurrentUserID();
+
+        if (!threatInput) {
+          resultContainer.innerHTML = "<p style='color: red;'>Please enter a valid input.</p>";
+          return;
+        }
+
+        try {
+          // Log the security event
+          const securityEventData = {
+            UserID: currentUserID,
+            ActionTaken: `Requested threat intelligence for ${threatType}: ${threatInput}`,
+            Timestamp: new Date().toISOString()
+          };
+          
+          await logSecurityEvent(securityEventData);
+
+          // Simulate API response with realistic data
+          const mockData = {
+            score: Math.floor(Math.random() * 10),
+            category: getMockCategory(threatType),
+            reason: getMockReason(threatType, threatInput),
+            geo: {
+              country: getMockCountry(),
+              region: getMockRegion()
+            }
+          };
+
+          // Store threat intelligence data
+          const threatData = {
+            ThreatType: threatType,
+            Severity: calculateSeverity(mockData.score),
+            Description: generateDescription(mockData, threatInput),
+            Timestamp: new Date().toISOString()
+          };
+          
+          await storeThreatIntelligence(threatData);
+
+          // Create incident report if severity is high
+          if (threatData.Severity >= 8) {
+            const incidentData = {
+              UserID: currentUserID,
+              IncidentType: `High Severity ${threatType} Threat`,
+              Status: "Open",
+              DateCreated: new Date().toISOString()
+            };
+            await createIncidentReport(incidentData);
+          }
+
+          // Display results
+          displayThreatResults(mockData, threatInput, resultContainer);
+
+        } catch (error) {
+          console.error("Error:", error);
+          resultContainer.innerHTML = `<p style='color: red;'>Error: ${error.message}</p>`;
+          
+          await logSecurityEvent({
+            UserID: currentUserID,
+            ActionTaken: `Error in threat intelligence request: ${error.message}`,
+            Timestamp: new Date().toISOString()
+          });
+        }
+      }
+
+      function calculateSeverity(score) {
+        return Math.min(Math.round(score * 10), 10);
+      }
+
+      function generateDescription(data, input) {
+        let description = `Analysis for ${input}: `;
+        if (data.score) description += `Risk Score: ${data.score}. `;
+        if (data.category) description += `Category: ${data.category}. `;
+        if (data.reason) description += data.reason;
+        return description;
+      }
+
+      function getMockCategory(threatType) {
+        const categories = {
+          'ip': ['Malicious Activity', 'Botnet', 'Command & Control', 'Spam Source'],
+          'domain': ['Malware Distribution', 'Phishing', 'Suspicious Activity', 'Known Bad'],
+          'url': ['Malicious Content', 'Phishing', 'Malware Distribution', 'Suspicious']
+        };
+        return categories[threatType][Math.floor(Math.random() * categories[threatType].length)];
+      }
+
+      function getMockReason(threatType, input) {
+        const reasons = {
+          'ip': [
+            `IP ${input} has been associated with malicious activity`,
+            `Multiple security incidents reported from this IP`,
+            `Known botnet command and control server`,
+            `Suspected spam source`
+          ],
+          'domain': [
+            `Domain ${input} has been used for phishing campaigns`,
+            `Known malware distribution domain`,
+            `Suspicious domain registration details`,
+            `Associated with malicious activity`
+          ],
+          'url': [
+            `URL ${input} contains malicious content`,
+            `Suspicious redirect chain detected`,
+            `Known phishing URL pattern`,
+            `Malware distribution point`
+          ]
+        };
+        return reasons[threatType][Math.floor(Math.random() * reasons[threatType].length)];
+      }
+
+      function getMockCountry() {
+        const countries = ['United States', 'China', 'Russia', 'Germany', 'France', 'Japan', 'Brazil', 'India'];
+        return countries[Math.floor(Math.random() * countries.length)];
+      }
+
+      function getMockRegion() {
+        const regions = ['North America', 'Europe', 'Asia', 'South America', 'Africa', 'Oceania'];
+        return regions[Math.floor(Math.random() * regions.length)];
+      }
+
+      function displayThreatResults(data, threatInput, container) {
+        let resultsHTML = `
+          <h4>Threat Report for ${threatInput}</h4>
+          <div class="threat-details">
+            <div class="risk-score ${getRiskScoreClass(data.score)}">
+              <p><strong>Risk Score:</strong> ${data.score}/10</p>
+            </div>
+            <p><strong>Category:</strong> ${data.category}</p>
+            <div class="location-details">
+                <h5>Location Information:</h5>
+                <p><strong>Country:</strong> ${data.geo.country}</p>
+                <p><strong>Region:</strong> ${data.geo.region}</p>
+            </div>
+            <p><strong>Reason:</strong> ${data.reason}</p>
+            <p><strong>Analysis Date:</strong> ${new Date().toLocaleString()}</p>
+            <div class="recommendations">
+              <h5>Recommendations:</h5>
+              <ul>
+                ${getRecommendations(data.score, data.category)}
+              </ul>
+            </div>
+          </div>
+        `;
+        container.innerHTML = resultsHTML;
+      }
+
+      function getRiskScoreClass(score) {
+        if (score >= 8) return 'high-risk';
+        if (score >= 5) return 'medium-risk';
+        return 'low-risk';
+      }
+
+      function getRecommendations(score, category) {
+        let recommendations = [];
+        
+        if (score >= 8) {
+          recommendations.push('<li>Immediate action required</li>');
+          recommendations.push('<li>Block the source</li>');
+          recommendations.push('<li>Initiate incident response procedures</li>');
+        } else if (score >= 5) {
+          recommendations.push('<li>Monitor the source</li>');
+          recommendations.push('<li>Update security controls</li>');
+          recommendations.push('<li>Document the finding</li>');
+        } else {
+          recommendations.push('<li>Continue monitoring</li>');
+          recommendations.push('<li>Document the finding</li>');
+        }
+
+        // Add category-specific recommendations
+        if (category.includes('Malware')) {
+          recommendations.push('<li>Update antivirus signatures</li>');
+          recommendations.push('<li>Scan affected systems</li>');
+        }
+        if (category.includes('Phishing')) {
+          recommendations.push('<li>Update email filters</li>');
+          recommendations.push('<li>Conduct user awareness training</li>');
+        }
+
+        return recommendations.join('');
+      }
+
+      async function refreshDatabaseView() {
+        try {
+          await Promise.all([
+            fetchAndDisplayUsers(),
+            fetchAndDisplaySecurityEvents(),
+            fetchAndDisplayThreatIntelligence(),
+            fetchAndDisplayIncidentReports()
+          ]);
+        } catch (error) {
+          console.error('Error refreshing database view:', error);
+        }
+      }
+
+      async function fetchAndDisplayUsers() {
+        try {
+          const response = await fetch('/api/users');
+          const users = await response.json();
+          const tableHTML = generateTableHTML(users, ['UserID', 'Username', 'Role', 'LastLogin']);
+          document.getElementById('users-table').innerHTML = tableHTML;
+        } catch (error) {
+          console.error('Error fetching users:', error);
+          document.getElementById('users-table').innerHTML = '<p class="error">Error loading users data</p>';
+        }
+      }
+
+      async function fetchAndDisplaySecurityEvents() {
+        try {
+          const response = await fetch('/api/security-events');
+          const events = await response.json();
+          const tableHTML = generateTableHTML(events, ['EventID', 'UserID', 'ActionTaken', 'Timestamp']);
+          document.getElementById('security-events-table').innerHTML = tableHTML;
+        } catch (error) {
+          console.error('Error fetching security events:', error);
+          document.getElementById('security-events-table').innerHTML = '<p class="error">Error loading security events</p>';
+        }
+      }
+
+      async function fetchAndDisplayThreatIntelligence() {
+        try {
+          const response = await fetch('/api/threat-intelligence');
+          const threats = await response.json();
+          const tableHTML = generateTableHTML(threats, ['ThreatID', 'ThreatType', 'Severity', 'Description']);
+          document.getElementById('threat-intelligence-table').innerHTML = tableHTML;
+        } catch (error) {
+          console.error('Error fetching threat intelligence:', error);
+          document.getElementById('threat-intelligence-table').innerHTML = '<p class="error">Error loading threat intelligence data</p>';
+        }
+      }
+
+      async function fetchAndDisplayIncidentReports() {
+        try {
+          const response = await fetch('/api/incident-reports');
+          const reports = await response.json();
+          const tableHTML = generateTableHTML(reports, ['ReportID', 'UserID', 'IncidentType', 'Status', 'DateCreated']);
+          document.getElementById('incident-reports-table').innerHTML = tableHTML;
+        } catch (error) {
+          console.error('Error fetching incident reports:', error);
+          document.getElementById('incident-reports-table').innerHTML = '<p class="error">Error loading incident reports</p>';
+        }
+      }
+
+      function generateTableHTML(data, columns) {
+        if (!data || data.length === 0) {
+          return '<p>No data available</p>';
+        }
+
+        let html = '<table class="database-table"><thead><tr>';
+        
+        columns.forEach(column => {
+          html += `<th>${formatColumnName(column)}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+
+        data.forEach(row => {
+          html += '<tr>';
+          columns.forEach(column => {
+            let value = row[column] || '';
+            if (column.includes('Date') || column.includes('Timestamp')) {
+              value = new Date(value).toLocaleString();
+            }
+            html += `<td>${value}</td>`;
+          });
+          html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        return html;
+      }
+
+      function formatColumnName(column) {
+        return column
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase());
+      }
+
+      function getCurrentUserID() {
+        return 101;
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const adminSection = document.getElementById('administrator-section');
+        if (adminSection && window.getComputedStyle(adminSection).display !== 'none') {
+          initializeAdminDashboard();
+        }
+      });
+
+      async function fetchMISPData(endpoint, params = {}) {
+        const baseUrl = 'https://your-misp-instance-url'; //MISP URL
+        const apiKey = 'your-api-key'; //  API key
+
+        try {
+          const response = await axios.get(`${baseUrl}${endpoint}`, {
+            headers: {
+              'Authorization': apiKey,
+              'Accept': 'application/json'
+            },
+            params: params
+          });
+          return response.data;
+        } catch (error) {
+          console.error('Error fetching MISP data:', error);
+          return null;
+        }
+      }
+
+      async function displayMISPEvents() {
+        const events = await fetchMISPData('/events/index');
+        if (events) {r
+          // Process and display the events data
+          console.log(events);
+          //  update  UI with the events data
+        }
+      }
+    </script>
+  </div>
+  <button onclick="importSQL()">Import SQL</button>
+  <script>
+    function importSQL() {
+      axios.get('http://localhost:3000/import-sql')
+        .then(response => {
+          alert(response.data);
+        })
+        .catch(error => {
+          console.error('Error importing SQL:', error);
+        });
+    }
+  </script>
+</body>
+</html>
